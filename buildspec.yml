@@ -1,0 +1,23 @@
+version: 0.2
+phases:
+  pre_build:
+    commands:
+      - echo Logging into Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+  build:
+    commands:
+      - echo Building the Jar...
+      - ./mvnw clean package
+      - echo Building the Docker image...
+      - docker build -t my-spring-app .
+      - docker tag my-spring-app:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/my-spring-app:latest
+  post_build:
+    commands:
+      - echo Pushing to ECR...
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/my-spring-app:latest
+      - echo Writing image definitions for EKS...
+      - printf '[{"name":"spring-boot-container","imageUri":"%s"}]' $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/my-spring-app:latest > imagedefinitions.json
+artifacts:
+  files:
+    - imagedefinitions.json
+    - k8s/*
